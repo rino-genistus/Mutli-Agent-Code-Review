@@ -1,0 +1,15 @@
+{
+  "mcp": {
+    "code-review-graph": {
+      "type": "local",
+      "command": [
+        "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+        "-m",
+        "code_review_graph",
+        "serve",
+        "--repo",
+        "/Users/rinoruban/Coding/Multi_agent_code_review/Mutli-Agent-Code-Review"
+      ]
+    }
+  }
+}

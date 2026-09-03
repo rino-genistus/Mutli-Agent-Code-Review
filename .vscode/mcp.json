@@ -1,0 +1,14 @@
+{
+  "servers": {
+    "code-review-graph": {
+      "command": "/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+      "args": [
+        "-m",
+        "code_review_graph",
+        "serve"
+      ],
+      "cwd": "/Users/rinoruban/Coding/Multi_agent_code_review/Mutli-Agent-Code-Review",
+      "type": "stdio"
+    }
+  }
+}
