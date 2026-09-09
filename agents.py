@@ -3,6 +3,10 @@ from dotenv import load_dotenv
 from github import Github
 from github import Auth
 import os
+from langchain.tools import tool
+from langchain.chat_models import init_chat_model
+import subprocess
+import json
 
 load_dotenv() 
 
@@ -53,7 +57,7 @@ def get_all_repo_files(repo) -> list:
     g.close()
     return files_list
 
-
+username = get_username()
 print(get_username())
 all_repos = get_user_repos()
 
@@ -66,6 +70,7 @@ class Code_review_agent:
         self.repo_name = repo_name
         self.repo = repos_hash[repo_name]
         self.files = get_all_repo_files(self.repo)
+        self.username = get_username()
 
     def review_code(self):
         """Review code in the repository."""
@@ -103,7 +108,62 @@ class Code_review_agent:
         ]
         }
         """
-        for file_path in self.files:
-            print(f"Reviewing file: {file_path}")
-            # Here you can add logic to read the file content and perform code review
-            # For example, you can use the agent to analyze the code and provide feedback
+
+    
+    def get_list_py_files(self) -> list:
+        """Return a list of all Python files in the repository."""
+        return [file for file in self.files if file.endswith(".py")]
+
+    def get_py_file_content(self, file_path: str) -> str:
+        """Get the content of a Python file in the repository."""
+        auth = Auth.Token(os.getenv("PAT"))
+        g = Github(auth=auth)
+        repo = g.get_repo(self.username + '/' + self.repo_name)
+        file_content = repo.get_contents(file_path).decoded_content.decode("utf-8")
+        g.close()
+        return file_content
+    
+    def code_review_tool_linter(self, code_string: str) -> list:
+        """Run ruff on the input code_string and return output."""
+        result = subprocess.run(
+            ["ruff", "check", "-", "--output-format=json"],
+            input=code_string,
+            text=True,
+            capture_output=True
+        )
+        if result.stdout:
+            return_string = json.loads(result.stdout)
+            return return_string
+        return []
+
+    def clean_code_review_data(self, code_review_data: list) -> list:
+        """Cleans data from linter, extracting only needed information"""
+        cleaned_findings = []
+        for data in code_review_data:
+            suggested_fix = None
+            if data['fix'] != None:
+                suggested_fix = data['fix']
+            cleaned_findings.append({
+                "line": data['location']['row'],
+                "rule": data['code'],
+                "message": data['message'],
+                "suggested_fix": suggested_fix if suggested_fix else "REQUIRES_LLM_RESOLUTION"
+            })
+            print(cleaned_findings)
+        return cleaned_findings
+
+    model = init_chat_model(
+        "gemini-3.5-flash-lite",
+        model_provider="google-genai",
+        temperature=0.5,
+        timeout=600,
+        max_tokens=25000,
+        streaming=True,
+    )
+
+cra = Code_review_agent(repo_name="AreaCompAgent")
+py_files = cra.get_list_py_files()
+cra.get_py_file_content(py_files[0])
+file_content = cra.get_py_file_content(py_files[2])
+review_tool_data = cra.code_review_tool_linter(code_string=file_content)
+cra.clean_code_review_data(review_tool_data)

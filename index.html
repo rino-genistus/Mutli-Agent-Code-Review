@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ReviewGrid — Workflow V2</title>
+<style>
+:root{
+  --bg:#0a0a0b;
+  --rail:#0b0b0d;
+  --side:#0e0e10;
+  --panel:#111114;
+  --panel2:#151519;
+  --panel3:#1a1a1f;
+  --border:#252529;
+  --border2:#323238;
+  --text:#f4f4f5;
+  --muted:#a1a1aa;
+  --muted2:#6f6f78;
+  --violet:#8b5cf6;
+  --violet2:#a78bfa;
+  --green:#22c55e;
+  --amber:#f59e0b;
+  --red:#ef4444;
+  --blue:#60a5fa;
+  --cyan:#22d3ee;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:var(--bg);color:var(--text);overflow:hidden;font-size:13px;
+}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+.app{
+  height:100vh;display:grid;
+  grid-template-columns:52px 214px minmax(520px,1fr) 328px;
+  grid-template-rows:46px minmax(0,1fr);
+}
+.locationbar{
+  grid-column:1/-1;grid-row:1;
+  display:flex;align-items:center;border-bottom:1px solid var(--border);
+  background:rgba(10,10,11,.96);z-index:50;
+}
+.location-left{width:266px;display:flex;align-items:center;height:100%;border-right:1px solid var(--border)}
+.brand{
+  width:52px;height:100%;display:grid;place-items:center;border-right:1px solid var(--border);
+}
+.logo{
+  width:24px;height:24px;border-radius:7px;display:grid;place-items:center;
+  background:linear-gradient(140deg,#a78bfa,#6d28d9 70%);font-size:9px;font-weight:900;
+  box-shadow:0 0 0 1px rgba(255,255,255,.08) inset;
+}
+.workspace{
+  padding:0 12px;display:flex;align-items:center;gap:8px;min-width:0;font-weight:650;font-size:12px;
+}
+.workspace .chev{color:var(--muted2)}
+.location-center{
+  min-width:0;flex:1;display:flex;align-items:center;padding:0 14px;gap:7px;
+}
+.crumb{color:var(--muted);font-size:12px;white-space:nowrap}
+.crumb.current{color:#e4e4e7;font-weight:600}
+.slash{color:#45454b}
+.location-right{
+  width:328px;border-left:1px solid var(--border);height:100%;
+  display:flex;align-items:center;justify-content:flex-end;padding:0 10px;gap:7px;
+}
+.cmd{
+  border:1px solid var(--border);background:#111114;color:var(--muted);
+  border-radius:7px;height:29px;padding:0 9px;display:flex;align-items:center;gap:8px;font-size:11px;
+}
+.kbd{border:1px solid #35353a;background:#19191d;border-radius:4px;padding:1px 4px;font-size:9px;color:#85858d}
+
+.rail{
+  grid-column:1;grid-row:2;border-right:1px solid var(--border);background:var(--rail);
+  padding:9px 7px;display:flex;flex-direction:column;align-items:center;gap:6px;
+}
+.rail-btn{
+  width:36px;height:36px;border:0;border-radius:9px;background:transparent;color:#707078;
+  display:grid;place-items:center;position:relative;
+}
+.rail-btn:hover{background:#161619;color:#d4d4d8}
+.rail-btn.active{background:#19151f;color:#c4b5fd}
+.rail-btn.active:before{
+  content:"";position:absolute;left:-7px;width:2px;height:18px;border-radius:99px;background:var(--violet2)
+}
+.rail-spacer{flex:1}
+.avatar{
+  width:27px;height:27px;border-radius:50%;border:1px solid #3a3a40;background:#1c1c21;
+  display:grid;place-items:center;font-weight:700;font-size:9px;color:#ddd6fe
+}
+
+.sidebar{
+  grid-column:2;grid-row:2;border-right:1px solid var(--border);background:var(--side);
+  overflow:auto;padding:12px 8px;
+}
+.navhead{
+  display:flex;align-items:center;justify-content:space-between;padding:4px 7px 10px;
+}
+.navhead strong{font-size:11px;color:#d4d4d8}
+.plus{border:0;background:transparent;color:#6f6f78;font-size:17px;line-height:1}
+.side-label{padding:12px 8px 6px;color:#62626b;font-size:9px;text-transform:uppercase;letter-spacing:.1em;font-weight:800}
+.side-item{
+  display:flex;align-items:center;gap:8px;border:0;background:transparent;border-radius:7px;
+  color:#97979f;width:100%;padding:7px 8px;text-align:left;font-size:11px;
+}
+.side-item:hover{background:#151518;color:#dedee2}
+.side-item.active{background:#18181c;color:#ededf0}
+.side-dot{width:6px;height:6px;border-radius:50%;background:#45454b}
+.side-dot.live{background:var(--green)}
+.side-count{margin-left:auto;font-size:9px;color:#62626b}
+.run-item{
+  margin:2px 0;border:1px solid transparent;border-radius:8px;padding:8px;
+}
+.run-item:hover{background:#141417;border-color:#202025}
+.run-top{display:flex;align-items:center;gap:7px;font-size:10px;color:#b5b5bc}
+.run-sub{margin:4px 0 0 14px;color:#62626b;font-size:9px}
+.status-ok{color:var(--green)} .status-run{color:var(--violet2)} .status-fail{color:var(--red)}
+
+.main{
+  grid-column:3;grid-row:2;min-width:0;position:relative;overflow:hidden;background:#0b0b0d;
+}
+.pagebar{
+  height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 13px;
+  justify-content:space-between;background:#0d0d0f;
+}
+.page-title{display:flex;align-items:center;gap:8px}
+.page-title strong{font-size:12px}
+.live-pill{
+  display:flex;align-items:center;gap:5px;border:1px solid rgba(34,197,94,.18);
+  color:#86efac;background:rgba(34,197,94,.06);border-radius:99px;padding:3px 7px;font-size:9px;font-weight:700;
+}
+.live-dot{width:5px;height:5px;background:var(--green);border-radius:50%;box-shadow:0 0 0 4px rgba(34,197,94,.07)}
+.page-actions{display:flex;gap:6px}
+.btn{
+  height:30px;border:1px solid var(--border);background:#141417;border-radius:7px;
+  padding:0 10px;font-size:10px;font-weight:650;color:#c8c8ce;
+}
+.btn:hover{border-color:#3a3a40;background:#18181c}
+.btn.primary{background:#f4f4f5;color:#111114;border-color:#f4f4f5}
+.btn.primary:hover{background:white}
+
+.viewbar{
+  height:38px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:4px;
+  background:#0c0c0e;
+}
+.viewtab{
+  height:27px;padding:0 8px;border:0;background:transparent;color:#6f6f78;border-radius:6px;font-size:10px;font-weight:650;
+}
+.viewtab.active{background:#18181c;color:#e4e4e7}
+.view-spacer{flex:1}
+.meta-chip{
+  border:1px solid var(--border);background:#121215;border-radius:6px;padding:4px 7px;color:#777780;font-size:9px;
+}
+.meta-chip b{color:#b9b9c0;font-weight:650}
+
+.canvas-wrap{
+  position:absolute;left:0;right:0;top:90px;bottom:0;overflow:hidden;
+}
+.canvas{
+  position:absolute;inset:0;overflow:auto;
+  background:
+    radial-gradient(circle at 52% 38%, rgba(139,92,246,.045), transparent 25%),
+    linear-gradient(rgba(255,255,255,.021) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.021) 1px,transparent 1px);
+  background-size:auto,22px 22px,22px 22px;
+}
+.graph-shell{
+  width:1250px;height:820px;position:relative;transform-origin:0 0;
+  margin:30px auto 100px;
+}
+.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:1}
+.edge{fill:none;stroke:#35353b;stroke-width:1.45}
+.edge.active{stroke:#8b5cf6;stroke-width:1.7;filter:drop-shadow(0 0 4px rgba(139,92,246,.35));stroke-dasharray:6 6;animation:dash 1s linear infinite}
+.edge.loop{stroke:#6d4fc7;stroke-dasharray:5 6}
+.edge.green{stroke:#3c7a51}
+@keyframes dash{to{stroke-dashoffset:-24}}
+
+.group{
+  position:absolute;border:1px dashed #34343a;border-radius:14px;background:rgba(17,17,20,.35);z-index:0;
+}
+.group.review{left:92px;top:257px;width:1030px;height:333px}
+.group-title{
+  position:absolute;top:-11px;left:14px;height:21px;display:flex;align-items:center;gap:7px;
+  background:#0b0b0d;padding:0 7px;color:#777780;font-size:9px;text-transform:uppercase;letter-spacing:.09em;font-weight:800;
+}
+.group-chip{
+  border:1px solid #34343a;border-radius:5px;padding:2px 5px;color:#9999a1;text-transform:none;letter-spacing:0;font-weight:650
+}
+.group-progress{position:absolute;right:14px;top:10px;color:#65656d;font-size:9px}
+.group-progress b{color:#b4b4bb}
+
+.node{
+  position:absolute;width:188px;min-height:80px;z-index:4;
+  border:1px solid #2e2e33;background:linear-gradient(180deg,#161619,#121215);
+  border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);
+  user-select:none;transition:border-color .15s,box-shadow .15s,transform .15s;
+}
+.node:hover{border-color:#44444b}
+.node.selected{border-color:#7661b8;box-shadow:0 0 0 2px rgba(139,92,246,.08),0 12px 36px rgba(0,0,0,.25)}
+.node.running{border-color:#624da0}
+.node-head{
+  height:34px;border-bottom:1px solid #26262b;display:flex;align-items:center;padding:0 9px;gap:7px;cursor:grab
+}
+.node-head:active{cursor:grabbing}
+.node-icon{
+  width:19px;height:19px;border-radius:5px;border:1px solid #34343a;background:#1d1d21;display:grid;place-items:center;
+  color:#b6b6bd;font-size:9px;font-weight:800;flex:none;
+}
+.node-title{font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node-status{margin-left:auto;width:6px;height:6px;border-radius:50%;background:#4d4d55}
+.complete .node-status{background:var(--green)}
+.running .node-status{background:var(--violet2);box-shadow:0 0 0 4px rgba(139,92,246,.08);animation:pulse 1.4s infinite}
+.waiting .node-status{background:#4c4c54}
+@keyframes pulse{50%{box-shadow:0 0 0 7px rgba(139,92,246,.025)}}
+.node-body{padding:8px 9px}
+.node-row{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#74747d;font-size:9px;line-height:1.75}
+.node-row b{color:#bdbdc4;font-weight:600;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.port{
+  position:absolute;width:7px;height:7px;border-radius:50%;border:1px solid #62626b;background:#18181c;z-index:8
+}
+.port.in{left:-4px;top:38px}.port.out{right:-4px;top:38px}
+.node.condition .node-icon{color:#facc15;background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.22)}
+.node.validator .node-icon{color:#c4b5fd;background:rgba(139,92,246,.09);border-color:rgba(139,92,246,.25)}
+.node.output .node-icon{color:#86efac;background:rgba(34,197,94,.07);border-color:rgba(34,197,94,.2)}
+
+#repo{left:528px;top:14px}
+#discover{left:528px;top:128px}
+#load{left:122px;top:326px}
+#security{left:365px;top:292px}
+#bug{left:365px;top:396px}
+#quality{left:608px;top:344px}
+#synth{left:850px;top:344px}
+#valid{left:850px;top:458px}
+#more{left:608px;top:486px}
+#final{left:850px;top:667px}
+
+.edge-label{
+  position:absolute;z-index:3;font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 5px;border-radius:5px;background:#0f0f12;border:1px solid #2d2d32;color:#66666f;
+}
+.edge-label.yes{color:#86efac;border-color:rgba(34,197,94,.18)}
+.edge-label.no{color:#c4b5fd;border-color:rgba(139,92,246,.22)}
+#labelValid{left:1047px;top:524px} #labelRetry{left:1045px;top:389px}
+#labelMore{left:555px;top:555px} #labelDone{left:790px;top:606px}
+
+.float-toolbar{
+  position:absolute;left:14px;bottom:14px;display:flex;border:1px solid #2d2d32;background:rgba(17,17,20,.92);
+  border-radius:8px;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.28);backdrop-filter:blur(8px);z-index:20
+}
+.tool-btn{width:31px;height:30px;border:0;border-right:1px solid #28282d;background:transparent;color:#777780;font-size:12px}
+.tool-btn:last-child{border-right:0}.tool-btn:hover{background:#1a1a1f;color:#e4e4e7}
+.zoomtext{width:44px;font-size:9px}
+.minimap{
+  position:absolute;right:14px;bottom:14px;width:152px;height:93px;border:1px solid #2c2c31;border-radius:8px;
+  background:rgba(15,15,18,.92);box-shadow:0 12px 32px rgba(0,0,0,.25);z-index:20;overflow:hidden;
+}
+.minimap:after{content:"";position:absolute;left:28px;top:13px;width:92px;height:61px;border:1px solid rgba(139,92,246,.25);background:rgba(139,92,246,.025);border-radius:3px}
+.mini-node{position:absolute;height:4px;border-radius:2px;background:#3e3e45}.mini-node.on{background:#7961ba}
+
+.runbar{
+  position:absolute;left:50%;bottom:14px;transform:translateX(-50%);height:42px;z-index:22;
+  border:1px solid #34343a;background:rgba(18,18,21,.95);border-radius:10px;
+  display:flex;align-items:center;gap:9px;padding:0 7px 0 11px;min-width:330px;box-shadow:0 16px 44px rgba(0,0,0,.35);backdrop-filter:blur(9px)
+}
+.run-pulse{width:7px;height:7px;border-radius:50%;background:#a78bfa;box-shadow:0 0 0 4px rgba(139,92,246,.08)}
+.run-copy{min-width:130px}
+.run-copy b{display:block;font-size:9px;margin-bottom:2px}.run-copy span{font-size:8px;color:#6f6f78}
+.progress{width:82px;height:4px;background:#29292e;border-radius:99px;overflow:hidden}.progress span{display:block;width:67%;height:100%;background:#8b5cf6}
+.runpct{font-size:8px;color:#777780}.pause{height:27px;border:1px solid #303036;background:#19191d;border-radius:6px;font-size:9px;padding:0 8px;color:#bcbcc3}
+
+.inspector{
+  grid-column:4;grid-row:2;border-left:1px solid var(--border);background:#0e0e10;overflow:auto;
+}
+.ins-head{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;justify-content:space-between}
+.ins-head strong{font-size:11px}
+.ins-close{border:0;background:transparent;color:#5f5f68}
+.ins-tabs{height:38px;border-bottom:1px solid var(--border);display:flex;padding:0 10px;gap:11px;align-items:end}
+.ins-tab{height:30px;border:0;border-bottom:1px solid transparent;background:transparent;color:#65656d;font-size:9px;font-weight:700;padding:0 2px}
+.ins-tab.active{color:#dddde1;border-bottom-color:#b4b4ba}
+.ins-content{padding:12px}
+.node-summary{display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.big-icon{width:32px;height:32px;border:1px solid #34343a;background:#19191d;border-radius:8px;display:grid;place-items:center;color:#c4b5fd;font-weight:800}
+.summary-copy b{font-size:11px;display:block;margin-bottom:2px}.summary-copy span{font-size:9px;color:#696971}
+.section{border-top:1px solid #242429;padding:13px 0}
+.section-title{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:#62626b;font-weight:800;margin-bottom:8px}
+.kv{display:flex;justify-content:space-between;gap:10px;padding:4px 0;font-size:9px}
+.kv span:first-child{color:#707078}.kv span:last-child{color:#b7b7be;text-align:right;font-weight:600}
+.output-card{border:1px solid #29292e;border-radius:8px;background:#131316;padding:9px;margin-top:6px}
+.out-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.sev{font-size:7px;font-weight:900;letter-spacing:.08em;border-radius:4px;padding:2px 4px}
+.sev.high{color:#fdba74;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.18)}
+.out-title{font-size:9px;font-weight:700;margin-bottom:3px}.out-file{font:8px ui-monospace,SFMono-Regular,Menlo,monospace;color:#686870}
+.trace{display:flex;gap:8px;padding:6px 0;font-size:8px;color:#a7a7ae}
+.trace-mark{width:14px;text-align:center;color:#7b7b84}.trace-copy{flex:1}.trace-time{color:#54545c}
+.ins-btn{width:100%;height:29px;border:1px solid #303036;background:#17171b;border-radius:7px;color:#b5b5bc;font-size:9px;font-weight:650}
+.ins-btn:hover{background:#1b1b20}
+
+.toast{
+  position:fixed;right:345px;top:59px;padding:8px 10px;border:1px solid #34343a;background:#17171b;border-radius:8px;
+  color:#c9c9cf;font-size:9px;box-shadow:0 12px 30px rgba(0,0,0,.28);opacity:0;transform:translateY(-5px);transition:.2s;z-index:100
+}
+.toast.show{opacity:1;transform:translateY(0)}
+
+@media(max-width:1150px){
+  .app{grid-template-columns:52px 190px minmax(520px,1fr)}
+  .inspector,.location-right{display:none}
+  .location-left{width:242px}
+}
+@media(max-width:820px){
+  .app{grid-template-columns:52px minmax(520px,1fr)}
+  .sidebar{display:none}
+  .location-left{width:52px}.workspace{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="locationbar">
+    <div class="location-left">
+      <div class="brand"><div class="logo">RG</div></div>
+      <div class="workspace">ReviewGrid <span class="chev">⌄</span></div>
+    </div>
+    <div class="location-center">
+      <span class="crumb">Workflows</span><span class="slash">/</span>
+      <span class="crumb current">Repository review</span><span class="slash">/</span>
+      <span class="crumb">Run #028</span>
+    </div>
+    <div class="location-right">
+      <button class="cmd">Search or command <span class="kbd">⌘ K</span></button>
+      <div class="avatar">RR</div>
+    </div>
+  </header>
+
+  <aside class="rail">
+    <button class="rail-btn">⌂</button>
+    <button class="rail-btn active">⌘</button>
+    <button class="rail-btn">✓</button>
+    <button class="rail-btn">◫</button>
+    <div class="rail-spacer"></div>
+    <button class="rail-btn">?</button>
+    <div class="avatar">RR</div>
+  </aside>
+
+  <aside class="sidebar">
+    <div class="navhead"><strong>Review workflows</strong><button class="plus">+</button></div>
+    <button class="side-item active"><span class="side-dot live"></span>Repository review<span class="side-count">⌘1</span></button>
+    <button class="side-item"><span class="side-dot"></span>PR fast review</button>
+    <button class="side-item"><span class="side-dot"></span>Security deep scan</button>
+
+    <div class="side-label">Views</div>
+    <button class="side-item">⌘ Workflow canvas</button>
+    <button class="side-item">⌁ Findings <span class="side-count">26</span></button>
+    <button class="side-item">▤ Files <span class="side-count">42</span></button>
+    <button class="side-item">◈ Agents <span class="side-count">3</span></button>
+
+    <div class="side-label">Recent runs</div>
+    <div class="run-item">
+      <div class="run-top"><span class="status-run">●</span><span>#028 · main</span><span class="side-count">now</span></div>
+      <div class="run-sub">28 / 42 files · running</div>
+    </div>
+    <div class="run-item">
+      <div class="run-top"><span class="status-ok">●</span><span>#027 · main</span><span class="side-count">18m</span></div>
+      <div class="run-sub">24 findings · 2 loops</div>
+    </div>
+    <div class="run-item">
+      <div class="run-top"><span class="status-fail">●</span><span>#026 · dev</span><span class="side-count">1h</span></div>
+      <div class="run-sub">GitHub API failure</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="pagebar">
+      <div class="page-title">
+        <strong>Repository review</strong>
+        <span class="live-pill"><span class="live-dot"></span>RUNNING</span>
+      </div>
+      <div class="page-actions">
+        <button class="btn" id="saveBtn">Save draft</button>
+        <button class="btn">•••</button>
+        <button class="btn primary" id="publishBtn">Publish workflow</button>
+      </div>
+    </div>
+    <div class="viewbar">
+      <button class="viewtab active">Canvas</button>
+      <button class="viewtab">Execution</button>
+      <button class="viewtab">Configuration</button>
+      <div class="view-spacer"></div>
+      <span class="meta-chip">repo <b>Mutli-Agent-Code-Review</b></span>
+      <span class="meta-chip">branch <b>main</b></span>
+      <span class="meta-chip">iteration <b>2 / 3</b></span>
+    </div>
+
+    <div class="canvas-wrap">
+      <div class="canvas" id="canvas">
+        <div class="graph-shell" id="graph">
+          <svg class="edges" id="edges" viewBox="0 0 1250 820">
+            <defs>
+              <marker id="arrowGray" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#55555e"/></marker>
+              <marker id="arrowPurple" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#8b5cf6"/></marker>
+              <marker id="arrowGreen" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#4c8d61"/></marker>
+            </defs>
+          </svg>
+
+          <div class="group review">
+            <div class="group-title">Per-file review loop <span class="group-chip">map × 42</span></div>
+            <div class="group-progress"><b>28</b> / 42 completed · current <b>agents.py</b></div>
+          </div>
+
+          <div class="node complete" id="repo" data-name="GitHub repository" data-desc="Authenticated source repository" data-icon="GH">
+            <span class="port in"></span><span class="port out"></span>
+            <div class="node-head"><div class="node-icon">GH</div><div class="node-title">GitHub repository</div><span class="node-status"></span></div>
+            <div class="node-body"><div class="node-row"><span>repository</span><b>Mutli-Agent-Code...</b></div><div class="node-row"><span>branch</span><b>main</b></div></div>
+          </div>
+
+          <div class="node complete" id="discover" data-name="Discover files" data-desc="Enumerates candidate files and applies repository ignore rules" data-icon="↧">
+            <span class="port in"></span><span class="port out"></span>
+            <div class="node-head"><div class="node-icon">↧</div><div class="node-title">Discover files</div><span class="node-status"></span></div>
+            <div class="node-body"><div class="node-row"><span>found</span><b>42 files</b></div><div class="node-row"><span>ignored</span><b>6 generated</b></div></div>
+          </div>
+
+          <div class="node complete" id="load" data-name="Load file" data-desc="Loads one repository file into the per-file review context" data-icon="{}">
+            <span class="port in"></span><span class="port out"></span>
+            <div class="node-head"><div class="node-icon">{}</div><div class="node-title">Load file</div><span class="node-status"></span></div>
+            <div class="node-body"><div class="node-row"><span>file</span><b>agents.py</b></div><div class="node-row"><span>size</span><b>3.8 KB</b></div></div>
+          </div>
+
+          <div class="node complete" id="security" data-name="Security agent" data-desc="Looks for security weaknesses and unsafe implementation patterns" data-icon="S">
+            <span class="port in"></span><span class="port out"></span>
+            <div class="node-head"><div class="node-icon">S</div><div class="node-title">Security agent</div><span class="node-status"></span></div>
+            <div class="node-body"><div class="node-row"><span>findings</span><b>4</b></div><div class="node-row"><span>confidence</span><b>91%</b></div></div>
+          </div>
+
+          <div class="node running selected" id="bug" data-name="Bug hunter" data-desc="Checks correctness, edge cases, runtime behavior, and control flow" data-icon="B">
+            <span class="port in"></span><span class="port out"></span>
+            <div class="node-head"><div class="node-icon">B</div><div class="node-title">Bug hunter</div><span class="node-status"></span></div>
+            <div class="node-body"><div class="node-row"><span>finding</span><b>7 candidates</b></div><div class="node-row"><span>pass</span><b>iteration 2</b></div></div>
+          </div>
+
+          <div class="node complete" id="quality" data-name="Quality agent" data-desc="Checks structure, maintainability, readability, and code smells" data-icon="Q">
+            <span class="port in"></span><span class="port out"></span>
+            <div class="node-head"><div class="node-icon">Q</div><div class="node-title">Quality agent</div><span class="node-status"></span></div>
+            <div class="node-body"><div class="node-row"><span>findings</span><b>5</b></div><div class="node-row"><span>confidence</span><b>88%</b></div></div>
+          </div>
+
+          <div class="node waiting" id="synth" data-name="Synthesize findings" data-desc="Deduplicates overlapping findings and combines agent evidence" data-icon="∑">
+            <span class="port in"></span><span class="port out"></span>
+            <div class="node-head"><div class="node-icon">∑</div><div class="node-title">Synthesize findings</div><span class="node-status"></span></div>
+            <div class="node-body"><div class="node-row"><span>inputs</span><b>3 agents</b></div><div class="node-row"><span>strategy</span><b>consensus</b></div></div>
+          </div>
+
+          <div class="node validator waiting" id="valid" data-name="Critic / validator" data-desc="Checks evidence quality and can route findings back through the agents" data-icon="✓">
+            <span class="port in"></span><span class="port out"></span>
+            <div class="node-head"><div class="node-icon">✓</div><div class="node-title">Critic / validator</div><span class="node-status"></span></div>
+            <div class="node-body"><div class="node-row"><span>rule</span><b>evidence required</b></div><div class="node-row"><span>max retries</span><b>3</b></div></div>
+          </div>
+
+          <div class="node condition waiting" id="more" data-name="More files?" data-desc="Continues the file map loop until all candidate files have been reviewed" data-icon="?">
+            <span class="port in"></span><span class="port out"></span>
+            <div class="node-head"><div class="node-icon">?</div><div class="node-title">More files?</div><span class="node-status"></span></div>
+            <div class="node-body"><div class="node-row"><span>remaining</span><b>14</b></div><div class="node-row"><span>reviewed</span><b>28 / 42</b></div></div>
+          </div>
+
+          <div class="node output waiting" id="final" data-name="Final review" data-desc="Produces the structured final review for the developer" data-icon="▤">
+            <span class="port in"></span><span class="port out"></span>
+            <div class="node-head"><div class="node-icon">▤</div><div class="node-title">Final review</div><span class="node-status"></span></div>
+            <div class="node-body"><div class="node-row"><span>format</span><b>structured JSON</b></div><div class="node-row"><span>destination</span><b>results view</b></div></div>
+          </div>
+
+          <span class="edge-label no" id="labelRetry">revise</span>
+          <span class="edge-label yes" id="labelValid">accept</span>
+          <span class="edge-label no" id="labelMore">yes · next file</span>
+          <span class="edge-label yes" id="labelDone">no · finish</span>
+        </div>
+      </div>
+
+      <div class="float-toolbar">
+        <button class="tool-btn" id="zoomOut">−</button>
+        <button class="tool-btn zoomtext" id="zoomText">100%</button>
+        <button class="tool-btn" id="zoomIn">+</button>
+        <button class="tool-btn" id="fitBtn">⌗</button>
+      </div>
+
+      <div class="minimap">
+        <span class="mini-node" style="left:69px;top:12px;width:22px"></span>
+        <span class="mini-node" style="left:69px;top:27px;width:22px"></span>
+        <span class="mini-node on" style="left:18px;top:47px;width:20px"></span>
+        <span class="mini-node on" style="left:50px;top:43px;width:20px"></span>
+        <span class="mini-node on" style="left:50px;top:57px;width:20px"></span>
+        <span class="mini-node" style="left:81px;top:50px;width:20px"></span>
+        <span class="mini-node" style="left:113px;top:50px;width:20px"></span>
+      </div>
+
+      <div class="runbar">
+        <span class="run-pulse"></span>
+        <div class="run-copy"><b id="runTitle">Run #028 in progress</b><span id="runSub">Bug hunter · agents.py · iteration 2</span></div>
+        <div class="progress"><span id="prog"></span></div>
+        <span class="runpct" id="pct">67%</span>
+        <button class="pause" id="simBtn">Pause</button>
+      </div>
+    </div>
+  </main>
+
+  <aside class="inspector">
+    <div class="ins-head"><strong>Inspector</strong><button class="ins-close">×</button></div>
+    <div class="ins-tabs"><button class="ins-tab active">Node</button><button class="ins-tab">Input</button><button class="ins-tab">Output</button><button class="ins-tab">Logs</button></div>
+    <div class="ins-content">
+      <div class="node-summary">
+        <div class="big-icon" id="insIcon">B</div>
+        <div class="summary-copy"><b id="insName">Bug hunter</b><span id="insDesc">Checks correctness, edge cases, runtime behavior, and control flow</span></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Execution</div>
+        <div class="kv"><span>Status</span><span id="insStatus">Running</span></div>
+        <div class="kv"><span>Current file</span><span>agents.py</span></div>
+        <div class="kv"><span>Iteration</span><span>2 / 3</span></div>
+        <div class="kv"><span>Duration</span><span>1.84 s</span></div>
+        <div class="kv"><span>Model</span><span>Gemini Flash Lite</span></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Latest output</div>
+        <div class="output-card">
+          <div class="out-top"><span class="sev high">HIGH</span><span style="font-size:8px;color:#65656d">92% confidence</span></div>
+          <div class="out-title">Import-time API side effects</div>
+          <div class="out-file">agents.py · application setup</div>
+        </div>
+        <div class="output-card">
+          <div class="out-top"><span class="sev high">HIGH</span><span style="font-size:8px;color:#65656d">99% confidence</span></div>
+          <div class="out-title">File contents are never reviewed</div>
+          <div class="out-file">agents.py · review_code()</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Execution trace</div>
+        <div class="trace"><span class="trace-mark status-ok">●</span><span class="trace-copy">Loaded <b>agents.py</b></span><span class="trace-time">2.1s</span></div>
+        <div class="trace"><span class="trace-mark status-ok">●</span><span class="trace-copy">Security agent completed</span><span class="trace-time">1.6s</span></div>
+        <div class="trace"><span class="trace-mark status-run">●</span><span class="trace-copy">Bug hunter reviewing retry feedback</span><span class="trace-time">now</span></div>
+        <div class="trace"><span class="trace-mark">○</span><span class="trace-copy">Waiting for synthesis</span><span class="trace-time">—</span></div>
+      </div>
+
+      <button class="ins-btn">Open full execution logs</button>
+    </div>
+  </aside>
+</div>
+
+<div class="toast" id="toast">Workflow saved</div>
+
+<script>
+const graph = document.getElementById('graph');
+const svg = document.getElementById('edges');
+const ns = 'http://www.w3.org/2000/svg';
+let scale = 1;
+
+const connections = [
+  ['repo','discover','normal'],
+  ['discover','load','active'],
+  ['load','security','active'],
+  ['load','bug','active'],
+  ['load','quality','normal'],
+  ['security','synth','normal'],
+  ['bug','synth','active'],
+  ['quality','synth','normal'],
+  ['synth','valid','normal'],
+  ['valid','more','green'],
+  ['more','final','green'],
+];
+
+function center(el){
+  return {x:el.offsetLeft+el.offsetWidth/2,y:el.offsetTop+el.offsetHeight/2,
+          left:el.offsetLeft,right:el.offsetLeft+el.offsetWidth,top:el.offsetTop,bottom:el.offsetTop+el.offsetHeight};
+}
+
+function addPath(d, cls='edge', marker='arrowGray'){
+  const p=document.createElementNS(ns,'path');
+  p.setAttribute('d',d);p.setAttribute('class',cls);p.setAttribute('marker-end',`url(#${marker})`);
+  svg.appendChild(p);return p;
+}
+
+function drawEdges(){
+  [...svg.querySelectorAll('path.edge')].forEach(p=>p.remove());
+
+  connections.forEach(([a,b,type])=>{
+    const A=center(document.getElementById(a)), B=center(document.getElementById(b));
+    const start={x:A.right,y:A.y}, end={x:B.left,y:B.y};
+    let d;
+    if(Math.abs(end.x-start.x)<45){
+      const sx=A.x, sy=A.bottom, ex=B.x, ey=B.top;
+      const my=(sy+ey)/2;
+      d=`M ${sx} ${sy} C ${sx} ${my}, ${ex} ${my}, ${ex} ${ey}`;
+    }else{
+      const dx=Math.max(55,Math.abs(end.x-start.x)*.46);
+      d=`M ${start.x} ${start.y} C ${start.x+dx} ${start.y}, ${end.x-dx} ${end.y}, ${end.x} ${end.y}`;
+    }
+    addPath(d,`edge ${type==='active'?'active':type==='green'?'green':''}`,
+            type==='active'?'arrowPurple':type==='green'?'arrowGreen':'arrowGray');
+  });
+
+  // Validator rejection -> agents. This is the self-correction loop.
+  let V=center(document.getElementById('valid')), B=center(document.getElementById('bug'));
+  addPath(`M ${V.right} ${V.y} C 1168 ${V.y}, 1168 264, ${B.x+35} 264 C ${B.x+35} 264, ${B.x+35} ${B.top-8}, ${B.x+35} ${B.top}`,
+          'edge loop active','arrowPurple');
+
+  // More files -> Load File. This is the per-file map loop.
+  let M=center(document.getElementById('more')), L=center(document.getElementById('load'));
+  addPath(`M ${M.x} ${M.bottom} C ${M.x} 619, 72 619, 72 ${L.y} C 72 ${L.y}, ${L.left-20} ${L.y}, ${L.left} ${L.y}`,
+          'edge loop','arrowPurple');
+}
+
+drawEdges();
+
+document.querySelectorAll('.node').forEach(node=>{
+  node.addEventListener('click',()=>{
+    document.querySelectorAll('.node').forEach(n=>n.classList.remove('selected'));
+    node.classList.add('selected');
+    document.getElementById('insName').textContent=node.dataset.name;
+    document.getElementById('insDesc').textContent=node.dataset.desc;
+    document.getElementById('insIcon').textContent=node.dataset.icon;
+    const s=node.classList.contains('running')?'Running':node.classList.contains('complete')?'Complete':'Waiting';
+    document.getElementById('insStatus').textContent=s;
+  });
+
+  const head=node.querySelector('.node-head');
+  let dragging=false, ox=0, oy=0;
+  head.addEventListener('mousedown',e=>{
+    dragging=true;
+    ox=e.clientX-node.offsetLeft*scale;
+    oy=e.clientY-node.offsetTop*scale;
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove',e=>{
+    if(!dragging)return;
+    const rect=graph.getBoundingClientRect();
+    const x=(e.clientX-rect.left)/scale - node.offsetWidth/2;
+    const y=(e.clientY-rect.top)/scale - 17;
+    node.style.left=Math.max(8,Math.min(1250-node.offsetWidth-8,x))+'px';
+    node.style.top=Math.max(8,Math.min(820-node.offsetHeight-8,y))+'px';
+    drawEdges();
+  });
+  window.addEventListener('mouseup',()=>dragging=false);
+});
+
+function setScale(next){
+  scale=Math.min(1.25,Math.max(.65,next));
+  graph.style.transform=`scale(${scale})`;
+  document.getElementById('zoomText').textContent=Math.round(scale*100)+'%';
+}
+document.getElementById('zoomIn').onclick=()=>setScale(scale+.1);
+document.getElementById('zoomOut').onclick=()=>setScale(scale-.1);
+document.getElementById('fitBtn').onclick=()=>setScale(.82);
+
+function toast(text){
+  const t=document.getElementById('toast');t.textContent=text;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1400);
+}
+document.getElementById('saveBtn').onclick=()=>toast('Draft saved');
+document.getElementById('publishBtn').onclick=()=>toast('Workflow published');
+
+let paused=false;
+document.getElementById('simBtn').onclick=(e)=>{
+  paused=!paused;
+  e.currentTarget.textContent=paused?'Resume':'Pause';
+  document.getElementById('runTitle').textContent=paused?'Run #028 paused':'Run #028 in progress';
+  document.querySelectorAll('.edge.active').forEach(x=>x.style.animationPlayState=paused?'paused':'running');
+};
+
+window.addEventListener('resize',drawEdges);
+</script>
+</body>
+</html>
