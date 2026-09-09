@@ -7,6 +7,8 @@ from langchain.tools import tool
 from langchain.chat_models import init_chat_model
 import subprocess
 import json
+import shutil
+import tempfile
 
 load_dotenv() 
 
@@ -71,6 +73,27 @@ class Code_review_agent:
         self.repo = repos_hash[repo_name]
         self.files = get_all_repo_files(self.repo)
         self.username = get_username()
+        self.files_cache: dict[str, str] = {}
+        self._temp_dir: str | None = None
+
+    def populate_cache(self, files: dict[str, str]):
+        """Call when downloading files from PyGithub"""
+        self.files_cache = files
+
+    def _ensure_local_workspace(self) -> str:
+        """Writes in-memory files to an ephemeral disk directory for CLI tools."""
+        if self._temp_dir and os.path.exists(self._temp_dir):
+            return self._temp_dir
+
+        self._temp_dir = tempfile.mkdtemp(prefix="agent_review_")
+
+        for rel_path, content in self.files_cache.items():
+            dest_path = os.path.join(self._temp_dir, rel_path)
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+            with open(dest_path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+        return self._temp_dir
 
     def review_code(self):
         """Review code in the repository."""
@@ -110,11 +133,11 @@ class Code_review_agent:
         """
 
     
-    def get_list_py_files(self) -> list:
+    def get_list_py_files(self) -> list: #Tested and Works
         """Return a list of all Python files in the repository."""
         return [file for file in self.files if file.endswith(".py")]
 
-    def get_py_file_content(self, file_path: str) -> str:
+    def get_py_file_content(self, file_path: str) -> str: #Tested and Works
         """Get the content of a Python file in the repository."""
         auth = Auth.Token(os.getenv("PAT"))
         g = Github(auth=auth)
@@ -123,7 +146,7 @@ class Code_review_agent:
         g.close()
         return file_content
     
-    def code_review_tool_linter(self, code_string: str) -> list:
+    def code_review_tool_linter(self, code_string: str) -> list: #Tested and Works
         """Run ruff on the input code_string and return output."""
         result = subprocess.run(
             ["ruff", "check", "-", "--output-format=json"],
@@ -136,7 +159,7 @@ class Code_review_agent:
             return return_string
         return []
 
-    def clean_code_review_data(self, code_review_data: list) -> list:
+    def clean_code_review_data(self, code_review_data: list) -> list: #Tested and Works
         """Cleans data from linter, extracting only needed information"""
         cleaned_findings = []
         for data in code_review_data:
@@ -152,6 +175,41 @@ class Code_review_agent:
             print(cleaned_findings)
         return cleaned_findings
 
+    def read_file_window(self, file_path: str, start_line: int, end_line: int) -> str: #Tested and Works
+        """Gets requested context window from requested file"""
+        return "\n".join(self.get_py_file_content(file_path).splitlines()[start_line:end_line])
+
+    def find_symbol_definition(self, symbol_name: str) -> list[dict]: #Tested and Works
+        working_dir = self._ensure_local_workspace()
+        pattern = rf"^\s*(def|class)\s+{symbol_name}\b"
+        cmd = ["rg", "--json", "-e", pattern, working_dir]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+
+        matches = []
+        for line in result.stdout.splitlines():
+            data = json.loads(line)
+            if data.get("type") == "match":
+                match_info = data["data"]
+                raw_path = match_info["path"]["text"]
+
+                # Convert back to clean repo-relative path
+                relative_file = os.path.relpath(raw_path, working_dir)
+
+                matches.append({
+                    "symbol": symbol_name,
+                    "file": relative_file,
+                    "line": match_info["line_number"],
+                    "line_text": match_info["lines"]["text"].strip(),
+                })
+
+        return matches
+
+    def cleanup(self): #Tested and Works
+        """Deletes temporary workspace when the review finishes."""
+        if self._temp_dir and os.path.exists(self._temp_dir):
+            shutil.rmtree(self._temp_dir)
+            self._temp_dir = None
+
     model = init_chat_model(
         "gemini-3.5-flash-lite",
         model_provider="google-genai",
@@ -162,8 +220,11 @@ class Code_review_agent:
     )
 
 cra = Code_review_agent(repo_name="AreaCompAgent")
-py_files = cra.get_list_py_files()
-cra.get_py_file_content(py_files[0])
-file_content = cra.get_py_file_content(py_files[2])
-review_tool_data = cra.code_review_tool_linter(code_string=file_content)
-cra.clean_code_review_data(review_tool_data)
+python_files = cra.get_list_py_files()
+file_dict = {}
+for file in python_files:
+    file_dict[file] = cra.get_py_file_content(file)
+cra.populate_cache(file_dict) #Populate Cache for Ripgrep functions with the dictionary of file and file content
+symbol_def_results = cra.find_symbol_definition("load_data")
+print(symbol_def_results)
+cra.cleanup()
