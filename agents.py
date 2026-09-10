@@ -2,6 +2,7 @@ from langchain.agents import create_agent
 from dotenv import load_dotenv
 from github import Github
 from github import Auth
+from github import Repository
 import os
 from langchain.tools import tool
 from langchain.chat_models import init_chat_model
@@ -9,6 +10,7 @@ import subprocess
 import json
 import shutil
 import tempfile
+import ast
 
 load_dotenv() 
 
@@ -26,6 +28,43 @@ result = agent.invoke(
     {"messages": [{"role": "user", "content": "What's the weather in New Brunswick?"}]}
 )
 #print(result["messages"][-1].content_blocks)
+
+class GithubService:
+    def __init__(self, token: str | None = None):
+        self._token = token or os.getenv("PAT")
+        if not self._token:
+            raise ValueError("Need Token for Github Services")
+        self.auth = Auth.Token(self._token)
+        self.g = Github(auth=self.auth)
+        self.username = self.g.get_user().login
+
+    def get_user_repos(self):
+        """Get the list of repositories for the authenticated user."""
+        return [repo for repo in self.g.get_user().get_repos()]
+
+    def get_repo(self, repo_name: str) -> Repository.Repository:
+        """Get the full name of the repository name"""
+        full_name = repo_name if "/" in repo_name else f"{self.username}/{repo_name}"
+        return self.g.get_repo(full_name)
+
+    def get_all_repo_files(self, repo, branch: str = "main") -> list:
+        """Get all files in the specified repository."""
+        repo_branch = repo.get_branch(branch)
+        tree = repo.get_git_tree(repo_branch.commit.sha, recursive=True)
+
+        files_list = []
+        for element in tree.tree:
+            if element.type == "blob":
+                files_list.append(element.path)
+
+        return files_list
+
+    
+
+    def close(self):
+        """Closes the underlying HTTP session cleanly."""
+        self.g.close()
+        
 
 def get_username() -> str:
     """Get the GitHub username of the authenticated user."""
@@ -177,7 +216,7 @@ class Code_review_agent:
 
     def read_file_window(self, file_path: str, start_line: int, end_line: int) -> str: #Tested and Works
         """Gets requested context window from requested file"""
-        return "\n".join(self.get_py_file_content(file_path).splitlines()[start_line:end_line])
+        return "\n".join(self.get_py_file_content(file_path).splitlines()[max(0, start_line - 1):end_line])
 
     def find_symbol_definition(self, symbol_name: str) -> list[dict]: #Tested and Works
         working_dir = self._ensure_local_workspace()
@@ -210,6 +249,54 @@ class Code_review_agent:
             shutil.rmtree(self._temp_dir)
             self._temp_dir = None
 
+    def ast_extract_all_functions(self, code_string: str) -> list[dict]:
+        """Yields every function in no particular order"""
+        tree = ast.parse(code_string)
+        functions = []
+
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                functions.append({
+                    "function_name": node.name,
+                    "start_line_number": node.lineno,
+                    "end_line_number": node.end_lineno, 
+                    "args": [a.arg for a in node.args.args if a.arg != "self"],
+                    "docstring": ast.get_docstring(node)
+                })
+        return functions
+
+    class OutlineVisitor(ast.NodeVisitor):
+        def __init__(self):
+            self.classes = []
+            self.functions = []
+            self._current_class = None
+
+        def visit_ClassDef(self, node: ast.ClassDef):
+            prev_class = self._current_class
+            self._current_class = node.name
+            self.classes.append({
+                "class_name": node.name,
+                "line": node.lineno,
+                "methods": []
+            })
+            # Continue traversing inside the class body
+            self.generic_visit(node)
+            self._current_class = prev_class
+
+        def visit_FunctionDef(self, node: ast.FunctionDef):
+            fn_data = {
+                "name": node.name,
+                "line": node.lineno,
+                "args": [arg.arg for arg in node.args.args]
+            }
+            if self._current_class:
+                # Nested inside a class -> record as method
+                self.classes[-1]["methods"].append(fn_data)
+            else:
+                # Top-level standalone function
+                self.functions.append(fn_data)
+            self.generic_visit(node)
+
     model = init_chat_model(
         "gemini-3.5-flash-lite",
         model_provider="google-genai",
@@ -228,3 +315,4 @@ cra.populate_cache(file_dict) #Populate Cache for Ripgrep functions with the dic
 symbol_def_results = cra.find_symbol_definition("load_data")
 print(symbol_def_results)
 cra.cleanup()
+cra.ast_code_structure()
