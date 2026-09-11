@@ -59,6 +59,16 @@ class GithubService:
 
         return files_list
 
+    def get_list_py_files(self, repo) -> list: #Tested and Works
+        """Return a list of all Python files in the repository."""
+        return [file for file in self.get_all_repo_files(repo) if file.endswith(".py")]
+
+    def get_py_file_content(self, file_path: str, repo_name: str) -> str: #Tested and Works
+        """Get the content of a Python file in the repository."""
+        repo = self.get_repo(repo_name)
+        file_content = repo.get_contents(file_path).decoded_content.decode("utf-8")
+        return file_content
+
     
 
     def close(self):
@@ -66,52 +76,12 @@ class GithubService:
         self.g.close()
         
 
-def get_username() -> str:
-    """Get the GitHub username of the authenticated user."""
-    auth = Auth.Token(os.getenv("PAT"))
-    g = Github(auth=auth)
-    username = g.get_user().login
-    g.close()
-    return username
-
-def get_user_repos() -> list:
-    """Get the list of repositories for the authenticated user."""
-    auth = Auth.Token(os.getenv("PAT"))
-    g = Github(auth=auth)
-    repos = [repo for repo in g.get_user().get_repos()]
-    g.close()
-    return repos
-
-def get_all_repo_files(repo) -> list:
-    """Get all files in the specified repository."""
-    auth = Auth.Token(os.getenv("PAT"))
-    g = Github(auth=auth)
-    user = g.get_user()  # Get the first repository
-    branch = repo.get_branch("main")
-    tree = repo.get_git_tree(branch.commit.sha, recursive=True)
-    
-    files_list = []
-    for element in tree.tree:
-        if element.type == "blob":
-            files_list.append(element.path)
-    
-    g.close()
-    return files_list
-
-username = get_username()
-print(get_username())
-all_repos = get_user_repos()
-
-repos_hash = {}
-for repo in all_repos:
-    repos_hash[repo.name] = repo
-
 class Code_review_agent:
-    def __init__(self, repo_name: str):
+    def __init__(self, repo_name: str, github_service: GithubService):
         self.repo_name = repo_name
-        self.repo = repos_hash[repo_name]
-        self.files = get_all_repo_files(self.repo)
-        self.username = get_username()
+        self.repo = self.gh.get_repo(repo_name)
+        self.files = self.gh.get_all_repo_files(self.repo)
+        self.username = self.gh.username
         self.files_cache: dict[str, str] = {}
         self._temp_dir: str | None = None
 
@@ -133,6 +103,14 @@ class Code_review_agent:
                 f.write(content)
 
         return self._temp_dir
+
+    def get_list_py_files(self) -> list:
+        return [f for f in self.files if f.endswith(".py")]
+
+    def get_py_file_content(self, file_path: str) -> str:
+        if file_path in self.files_cache:
+            return self.files_cache[file_path]
+        return self.gh.get_py_file_content(file_path, self.repo_name)
 
     def review_code(self):
         """Review code in the repository."""
@@ -171,19 +149,6 @@ class Code_review_agent:
         }
         """
 
-    
-    def get_list_py_files(self) -> list: #Tested and Works
-        """Return a list of all Python files in the repository."""
-        return [file for file in self.files if file.endswith(".py")]
-
-    def get_py_file_content(self, file_path: str) -> str: #Tested and Works
-        """Get the content of a Python file in the repository."""
-        auth = Auth.Token(os.getenv("PAT"))
-        g = Github(auth=auth)
-        repo = g.get_repo(self.username + '/' + self.repo_name)
-        file_content = repo.get_contents(file_path).decoded_content.decode("utf-8")
-        g.close()
-        return file_content
     
     def code_review_tool_linter(self, code_string: str) -> list: #Tested and Works
         """Run ruff on the input code_string and return output."""
@@ -306,13 +271,22 @@ class Code_review_agent:
         streaming=True,
     )
 
-cra = Code_review_agent(repo_name="AreaCompAgent")
+gh_service = GithubService()
+cra = Code_review_agent(repo_name="AreaCompAgent", github_service=gh_service)
+
 python_files = cra.get_list_py_files()
-file_dict = {}
-for file in python_files:
-    file_dict[file] = cra.get_py_file_content(file)
-cra.populate_cache(file_dict) #Populate Cache for Ripgrep functions with the dictionary of file and file content
+file_dict = {f: cra.get_py_file_content(f) for f in python_files}
+cra.populate_cache(file_dict)
+
 symbol_def_results = cra.find_symbol_definition("load_data")
 print(symbol_def_results)
+
+tree = ast.parse(python_files[2])
+visitor = cra.OutlineVisitor()
+visitor.visit(tree)
+
+print("Classes:", visitor.classes)
+print("Top-level functions:", visitor.functions)
+
 cra.cleanup()
-cra.ast_code_structure()
+gh_service.close()
